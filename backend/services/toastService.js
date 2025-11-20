@@ -57,6 +57,7 @@ class ToastService {
   
   /**
    * Authenticate with Toast API and get access token
+   * Toast API uses JSON format: { clientId, clientSecret, scope }
    */
   async authenticate() {
     // Check if we have a valid token
@@ -64,90 +65,32 @@ class ToastService {
       return this.accessToken;
     }
     
-    // Toast API authentication - OAuth2 client credentials flow
-    // Based on standard OAuth2 pattern (similar to Rail.io, Stripe, etc.)
+    // Toast API authentication endpoint
     const authEndpoint = `${this.baseURL}/authentication/v1/authentication/login`;
     
-    // OAuth2: Base64 encode clientId:secret for Basic Auth
-    const basicAuth = Buffer.from(`${this.clientId}:${this.clientSecret}`).toString('base64');
+    // Toast API expects JSON format with clientId, clientSecret, and scope
+    const requestBody = {
+      clientId: this.clientId,
+      clientSecret: this.clientSecret,
+      scope: this.apiScopes
+    };
     
-    // Try OAuth2 client credentials flow variations
-    const authMethods = [
-      // Method 1: OAuth2 Standard - Basic Auth + form-encoded body (most common)
-      {
-        name: 'OAuth2 Basic Auth + Form Data',
-        headers: {
-          'Authorization': `Basic ${basicAuth}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Accept': 'application/json'
-        },
-        body: `grant_type=client_credentials&scope=${encodeURIComponent(this.apiScopes)}`,
-        isFormData: true
-      },
-      // Method 2: OAuth2 Standard - Basic Auth + JSON body
-      {
-        name: 'OAuth2 Basic Auth + JSON',
-        headers: {
-          'Authorization': `Basic ${basicAuth}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: {
-          grant_type: 'client_credentials',
-          scope: this.apiScopes
-        },
-        isFormData: false
-      },
-      // Method 3: Toast-specific format - JSON body with credentials
-      {
-        name: 'Toast JSON Format',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: {
-          clientId: this.clientId,
-          clientSecret: this.clientSecret,
-          scope: this.apiScopes
-        },
-        isFormData: false
-      },
-      // Method 4: Toast alternative - different field names
-      {
-        name: 'Toast Alt Format',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: {
-          client_id: this.clientId,
-          client_secret: this.clientSecret,
-          scope: this.apiScopes
-        },
-        isFormData: false
-      }
-    ];
-    
-    let lastError = null;
-    
-    for (const method of authMethods) {
-      try {
-        console.log(`🔐 Attempting Toast authentication: ${method.name}`);
-        console.log(`   Endpoint: ${authEndpoint}`);
-        console.log(`   Client ID: ${this.clientId || 'MISSING'}`);
-        console.log(`   Restaurant GUID: ${this.restaurantGuid || 'MISSING'}`);
-        console.log(`   Scopes: ${this.apiScopes}`);
-        console.log(`   Using Basic Auth: ${method.headers['Authorization'] ? 'YES' : 'NO'}`);
+    try {
+      console.log(`🔐 Authenticating with Toast API...`);
+      console.log(`   Endpoint: ${authEndpoint}`);
+      console.log(`   Client ID: ${this.clientId || 'MISSING'}`);
+      console.log(`   Restaurant GUID: ${this.restaurantGuid || 'MISSING'}`);
+      console.log(`   Scopes: ${this.apiScopes}`);
+      console.log(`   Request Body: ${JSON.stringify({ ...requestBody, clientSecret: '***HIDDEN***' })}`);
       
-        // Send request - handle both form data and JSON
-        const response = await axios.post(
-          authEndpoint, 
-          method.isFormData ? method.body : method.body,
-          {
-            headers: method.headers,
-            timeout: 30000
-          }
-        );
+      // Toast API requires application/json Content-Type
+      const response = await axios.post(authEndpoint, requestBody, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        timeout: 30000
+      });
         
         if (response.status === 200 || response.status === 201) {
           // Parse token from response
