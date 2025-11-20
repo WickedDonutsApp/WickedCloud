@@ -37,6 +37,45 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    message: 'Wicked Donuts backend running',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Toast authentication test endpoint
+app.get('/api/toast/test-auth', async (req, res) => {
+  try {
+    console.log('🧪 Testing Toast authentication...');
+    
+    // Try to get a valid token (this will authenticate if needed)
+    const token = await toastService.getValidToken();
+    
+    if (token) {
+      console.log('✅ Toast authentication test successful');
+      res.json({ 
+        ok: true, 
+        message: 'Toast authentication works!',
+        tokenLength: token.length,
+        hasToken: !!token
+      });
+    } else {
+      throw new Error('No token received from Toast');
+    }
+  } catch (err) {
+    console.error('❌ Toast auth test failed', err?.response?.data || err?.message);
+    res.status(500).json({
+      ok: false,
+      message: 'Toast authentication failed',
+      error: err?.response?.data || err?.message,
+      details: err?.stack
+    });
+  }
+});
+
 // API Routes
 const apiRouter = express.Router();
 

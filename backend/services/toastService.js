@@ -317,7 +317,48 @@ class ToastService {
     if (!this.accessToken || !this.tokenExpirationDate || new Date() >= this.tokenExpirationDate) {
       await this.authenticate();
     }
+    if (!this.accessToken) {
+      throw new Error('Failed to get Toast access token');
+    }
     return this.accessToken;
+  }
+  
+  /**
+   * Make an authenticated request to Toast API
+   * Helper function similar to toastRequest in TypeScript example
+   */
+  async toastRequest(method, path, data = null) {
+    const token = await this.getValidToken();
+    const url = `${this.baseURL}${path}`;
+    
+    try {
+      const config = {
+        method: method,
+        url: url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'Toast-Restaurant-External-ID': this.restaurantGuid
+        },
+        timeout: 30000
+      };
+      
+      if (data) {
+        config.data = data;
+      }
+      
+      const response = await this.api.request(config);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Toast API request failed', {
+        url,
+        method,
+        status: error?.response?.status,
+        data: error?.response?.data,
+        message: error?.message
+      });
+      throw error;
+    }
   }
   
   /**
