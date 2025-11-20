@@ -57,6 +57,56 @@ class ToastService {
   }
   
   /**
+   * Debug Toast authentication - Log all details for troubleshooting
+   */
+  async debugToastAuthOnce() {
+    console.log('🔥 DEBUG Toast auth starting');
+    console.log('🔥 TOAST_API_BASE_URL =', this.baseURL);
+    console.log('🔥 hasClientId =', !!this.clientId);
+    console.log('🔥 hasClientSecret =', !!this.clientSecret);
+    console.log('🔥 clientId prefix =', this.clientId?.substring(0, 6));
+    console.log('🔥 Restaurant GUID =', this.restaurantGuid);
+    
+    // Clean URL (remove trailing slashes)
+    const cleanBaseURL = this.baseURL.replace(/\/+$/, '');
+    const url = `${cleanBaseURL}/authentication/v1/authentication/login`;
+    const payload = {
+      clientId: this.clientId,
+      clientSecret: this.clientSecret,
+      userAccessType: "TOAST_MACHINE_CLIENT"
+    };
+    
+    console.log('🔥 Auth URL:', url);
+    console.log('🔥 Payload shape:', {
+      clientIdType: typeof payload.clientId,
+      clientSecretType: typeof payload.clientSecret,
+      userAccessType: payload.userAccessType,
+      clientIdLength: payload.clientId?.length,
+      clientSecretLength: payload.clientSecret?.length
+    });
+    
+    try {
+      const res = await axios.post(url, payload, {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 30000
+      });
+      console.log('✅ Toast auth SUCCESS:', res.data);
+      return { success: true, data: res.data };
+    } catch (error) {
+      console.error('❌ Toast auth FAILED');
+      console.error('❌ Status:', error?.response?.status);
+      console.error('❌ Data:', error?.response?.data);
+      console.error('❌ Message:', error?.message);
+      return { 
+        success: false, 
+        status: error?.response?.status,
+        data: error?.response?.data,
+        message: error?.message
+      };
+    }
+  }
+  
+  /**
    * Authenticate with Toast API - Use correct format with userAccessType
    * Based on official Toast API documentation
    */
@@ -67,7 +117,9 @@ class ToastService {
     }
     
     // Toast API requires userAccessType: "TOAST_MACHINE_CLIENT"
-    const authEndpoint = `${this.baseURL}/authentication/v1/authentication/login`;
+    // Clean URL (remove trailing slashes)
+    const cleanBaseURL = this.baseURL.replace(/\/+$/, '');
+    const authEndpoint = `${cleanBaseURL}/authentication/v1/authentication/login`;
     const payload = {
       clientId: this.clientId,
       clientSecret: this.clientSecret,

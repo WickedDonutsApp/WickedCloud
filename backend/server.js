@@ -76,6 +76,38 @@ app.get('/api/toast/test-auth', async (req, res) => {
   }
 });
 
+// Toast authentication debug endpoint - shows detailed debug info
+app.get('/api/toast/debug-auth', async (req, res) => {
+  try {
+    console.log('🔥 DEBUG: Starting Toast authentication debug...');
+    const result = await toastService.debugToastAuthOnce();
+    
+    if (result.success) {
+      res.json({
+        ok: true,
+        message: 'Toast authentication debug successful',
+        result: result
+      });
+    } else {
+      res.status(500).json({
+        ok: false,
+        message: 'Toast authentication debug failed',
+        status: result.status,
+        error: result.data,
+        message: result.message
+      });
+    }
+  } catch (err) {
+    console.error('❌ Toast debug failed', err?.message);
+    res.status(500).json({
+      ok: false,
+      message: 'Toast debug failed',
+      error: err?.message,
+      details: err?.stack
+    });
+  }
+});
+
 // API Routes
 const apiRouter = express.Router();
 
