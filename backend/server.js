@@ -94,7 +94,7 @@ app.get('/api/toast/debug-auth', async (req, res) => {
         message: 'Toast authentication debug failed',
         status: result.status,
         error: result.data,
-        message: result.message
+        errorMessage: result.message
       });
     }
   } catch (err) {
@@ -104,6 +104,20 @@ app.get('/api/toast/debug-auth', async (req, res) => {
       message: 'Toast debug failed',
       error: err?.message,
       details: err?.stack
+    });
+  }
+});
+
+// Simple debug endpoint (matches TypeScript example)
+app.get('/debug/toast-auth', async (req, res) => {
+  try {
+    await toastService.debugToastAuthOnce();
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ 
+      ok: false, 
+      error: e?.message,
+      details: e?.response?.data || e?.stack
     });
   }
 });
