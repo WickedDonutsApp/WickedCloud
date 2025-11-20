@@ -91,84 +91,85 @@ class ToastService {
         },
         timeout: 30000
       });
+      
+      if (response.status === 200 || response.status === 201) {
+        // Parse token from response
+        let token = null;
+        let expiresIn = 3600; // Default 1 hour
         
-        if (response.status === 200 || response.status === 201) {
-          // Parse token from response
-          let token = null;
-          let expiresIn = 3600; // Default 1 hour
-          
-          // Toast API response format variations
-          if (response.data && response.data.token) {
-            token = response.data.token.accessToken || response.data.token.token || response.data.token;
-            expiresIn = response.data.token.expiresIn || response.data.expiresIn || 3600;
-          } else if (response.data && response.data.accessToken) {
+        // Toast API response format - check common patterns
+        if (response.data) {
+          // Pattern 1: { token: { accessToken: "...", expiresIn: 3600 } }
+          if (response.data.token && response.data.token.accessToken) {
+            token = response.data.token.accessToken;
+            expiresIn = response.data.token.expiresIn || 3600;
+          }
+          // Pattern 2: { accessToken: "...", expiresIn: 3600 }
+          else if (response.data.accessToken) {
             token = response.data.accessToken;
             expiresIn = response.data.expiresIn || 3600;
-          } else if (typeof response.data === 'string') {
-            token = response.data;
-          } else if (response.data && response.data.access_token) {
+          }
+          // Pattern 3: { token: "..." } (string token)
+          else if (response.data.token && typeof response.data.token === 'string') {
+            token = response.data.token;
+            expiresIn = response.data.expiresIn || 3600;
+          }
+          // Pattern 4: { access_token: "...", expires_in: 3600 }
+          else if (response.data.access_token) {
             token = response.data.access_token;
             expiresIn = response.data.expires_in || 3600;
           }
-          
-          if (!token) {
-            console.error('❌ No token in response:', JSON.stringify(response.data, null, 2));
-            throw new Error('No access token found in response');
+          // Pattern 5: Direct string response
+          else if (typeof response.data === 'string') {
+            token = response.data;
           }
-          
-          this.accessToken = token;
-          this.tokenExpirationDate = new Date(Date.now() + (expiresIn * 1000) - 60000); // Subtract 1 minute for safety
-          
-          console.log(`✅ Toast authentication successful using: ${method.name}`);
-          console.log(`   Token expires in: ${expiresIn} seconds`);
-          return this.accessToken;
-        } else {
-          throw new Error(`Unexpected status code: ${response.status}`);
         }
-      } catch (error) {
-        lastError = error;
         
-        if (error.response) {
-          const status = error.response.status;
-          const data = error.response.data;
-          
-          if (status === 401) {
-            // Invalid credentials - try next method
-            console.error(`❌ Toast Authentication 401 using ${method.name}:`);
-            console.error('   Response:', JSON.stringify(data, null, 2));
-            
-            // Try next method if available
-            if (authMethods.indexOf(method) < authMethods.length - 1) {
-              console.log(`   Trying next authentication method...`);
-              continue;
-            }
-            
-            // All methods failed - credentials are wrong
-            const errorMsg = data?.error || data?.message || data?.error_description || 'Invalid credentials';
-            console.error('❌ All authentication methods failed with 401');
-            console.error('   This means the credentials are incorrect or expired');
-            console.error('   Client ID:', this.clientId);
-            console.error('   Restaurant GUID:', this.restaurantGuid);
-            console.error('   Please verify credentials in Toast Partner Connect: https://partnerconnect.toasttab.com/');
-            throw new Error(`Toast authentication failed (401): ${errorMsg}. Credentials are incorrect or expired. Please verify TOAST_CLIENT_ID, TOAST_CLIENT_SECRET, and TOAST_RESTAURANT_GUID in Railway Variables match your Toast Partner Connect settings.`);
-          } else if (status === 404) {
-            // Endpoint not found - try next method
-            console.log(`⚠️ Endpoint not found (404), trying next method...`);
-            continue;
-          } else {
-            console.error(`❌ Toast authentication error (${status}):`, JSON.stringify(data, null, 2));
-            throw new Error(`Toast authentication failed (${status}): ${data?.error || data?.message || 'Unknown error'}`);
-          }
-        } else {
-          // Network error - try next method
-          console.log(`⚠️ Network error, trying next method...`);
-          continue;
+        if (!token) {
+          console.error('❌ No token in response:', JSON.stringify(response.data, null, 2));
+          throw new Error('No access token found in response');
         }
+        
+        this.accessToken = token;
+        this.tokenExpirationDate = new Date(Date.now() + (expiresIn * 1000) - 60000); // Subtract 1 minute for safety
+        
+        console.log('✅ Toast authentication successful');
+        console.log(`   Token expires in: ${expiresIn} seconds`);
+        return this.accessToken;
+      } else {
+        throw new Error(`Unexpected status code: ${response.status}`);
+      }
+    } catch (error) {
+      if (error.response) {
+        const status = error.response.status;
+        const data = error.response.data;
+        
+        if (status === 401) {
+          // Invalid credentials
+          const errorMsg = data?.error || data?.message || data?.error_description || 'Invalid credentials';
+          console.error('❌ Toast Authentication 401 - Invalid Credentials:');
+          console.error('   Endpoint:', authEndpoint);
+          console.error('   Client ID:', this.clientId);
+          console.error('   Restaurant GUID:', this.restaurantGuid);
+          console.error('   Scopes:', this.apiScopes);
+          console.error('   Toast Response:', JSON.stringify(data, null, 2));
+          throw new Error(`Toast authentication failed (401): ${errorMsg}. Please verify TOAST_CLIENT_ID, TOAST_CLIENT_SECRET, and TOAST_RESTAURANT_GUID in Railway Variables match your Toast Partner Connect settings at https://partnerconnect.toasttab.com/`);
+        } else if (status === 415) {
+          // Unsupported Media Type - Content-Type is wrong
+          console.error('❌ Toast Authentication 415 - Unsupported Media Type:');
+          console.error('   This means the Content-Type header is incorrect');
+          console.error('   Expected: application/json');
+          console.error('   Response:', JSON.stringify(data, null, 2));
+          throw new Error(`Toast authentication failed (415): Unsupported Media Type. Toast API requires 'Content-Type: application/json'. Response: ${JSON.stringify(data)}`);
+        } else {
+          console.error(`❌ Toast authentication error (${status}):`, JSON.stringify(data, null, 2));
+          throw new Error(`Toast authentication failed (${status}): ${data?.error || data?.message || JSON.stringify(data)}`);
+        }
+      } else {
+        console.error('❌ Toast authentication network error:', error.message);
+        throw new Error(`Toast authentication network error: ${error.message}`);
       }
     }
-    
-    // If we get here, all methods failed
-    throw lastError || new Error('Toast authentication failed: All authentication methods failed');
   }
   
   /**
